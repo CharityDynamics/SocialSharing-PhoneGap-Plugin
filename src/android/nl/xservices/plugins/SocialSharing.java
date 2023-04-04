@@ -338,7 +338,9 @@ public class SocialSharing extends CordovaPlugin {
             if (peek) {
               callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK));
             } else {
-              sendIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+              if (Build.VERSION.SDK_INT < 33) {
+                sendIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+              }
               sendIntent.setComponent(new ComponentName(activity.applicationInfo.packageName,
                   passedActivityName != null ? passedActivityName : activity.name));
 
