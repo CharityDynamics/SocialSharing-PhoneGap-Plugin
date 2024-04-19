@@ -492,45 +492,53 @@ static NSString *const kShareOptionIPadCoordinates = @"iPadCoordinates";
 }
 
 - (void)shareViaSMS:(CDVInvokedUrlCommand*)command {
-  if ([self canShareViaSMS]) {
-    NSDictionary* options = [command.arguments objectAtIndex:0];
-    NSString *phonenumbers = [command.arguments objectAtIndex:1];
-    NSString *message = [options objectForKey:@"message"];
-    NSString *subject = [options objectForKey:@"subject"];
-    NSString *image = [options objectForKey:@"image"];
+    if ([self canShareViaSMS]) {
+        NSDictionary* options = [command.arguments objectAtIndex:0];
+        NSString *phonenumbers = [command.arguments objectAtIndex:1];
+        NSString *message = [options objectForKey:@"message"];
+        NSString *subject = [options objectForKey:@"subject"];
+        NSString *image = [options objectForKey:@"image"];
 
-    MFMessageComposeViewController *picker = [[MFMessageComposeViewController alloc] init];
-    picker.messageComposeDelegate = (id) self;
-    if (message != (id)[NSNull null]) {
-      picker.body = message;
-    }
-    if (subject != (id)[NSNull null]) {
-      [picker setSubject:subject];
-    }
-    if (image != nil && image != (id)[NSNull null]) {
-      BOOL canSendAttachments = [[MFMessageComposeViewController class] respondsToSelector:@selector(canSendAttachments)];
-      if (canSendAttachments) {
-        NSURL *file = [self getFile:image];
-        if (file != nil) {
-          [picker addAttachmentURL:file withAlternateFilename:nil];
+        MFMessageComposeViewController *picker = [[MFMessageComposeViewController alloc] init];
+        picker.messageComposeDelegate = (id) self;
+        if (message && ![message isKindOfClass:[NSNull class]]) {
+            picker.body = message;
         }
-      }
-    }
+        if (subject && ![subject isKindOfClass:[NSNull class]]) {
+            [picker setSubject:subject];
+        }
+        if (image && ![image isKindOfClass:[NSNull class]]) {
+            BOOL canSendAttachments = [MFMessageComposeViewController canSendAttachments];
+            if (canSendAttachments) {
+                NSURL *file = [self getFile:image];
+                if (file) {
+                    [picker addAttachmentURL:file withAlternateFilename:nil];
+                }
+            }
+        }
 
-    if (phonenumbers != (id)[NSNull null]) {
-      [picker setRecipients:[phonenumbers componentsSeparatedByString:@","]];
+        if (phonenumbers && ![phonenumbers isKindOfClass:[NSNull class]]) {
+            [picker setRecipients:[phonenumbers componentsSeparatedByString:@","]];
+        }
+
+        _command = command;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            picker.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
+            UIViewController *viewController = [self getTopMostViewController];
+            if (viewController) {
+                [viewController presentViewController:picker animated:YES completion:nil];
+            } else {
+                // Handle the case where there is no top-most view controller
+                CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"No top-most view controller found"];
+                [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+            }
+        });
+    } else {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"not available"];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }
-    // remember the command, because we need it in the didFinishWithResult method
-    _command = command;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      picker.modalTransitionStyle = UIModalTransitionStyleCrossDissolve;
-      [[self getTopMostViewController] presentViewController:picker animated:NO completion:nil];
-    });
-  } else {
-    CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:@"not available"];
-    [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-  }
 }
+
 
 // Dismisses the SMS composition interface when users taps Cancel or Send
 - (void)messageComposeViewController:(MFMessageComposeViewController *)controller didFinishWithResult:(MessageComposeResult)result {
